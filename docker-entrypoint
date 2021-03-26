@@ -56,6 +56,13 @@ restart_container() {
   docker_curl -f -X POST "${HTTP_ENDPOINT}/containers/${container_id}/restart?t=${timeout}"
 }
 
+# shellcheck disable=2039
+start_container() {
+  local container_id="$1"
+
+  docker_curl -f -X POST "${HTTP_ENDPOINT}/containers/${container_id}/start"
+}
+
 # SIGTERM-handler
 term_handler() {
   exit 143  # 128 + 15 -- SIGTERM
@@ -94,6 +101,17 @@ if [ "$1" = "autoheal" ] && [ -e "$DOCKER_SOCK" ];then
         if ! restart_container "$CONTAINER_ID" "$TIMEOUT"
         then
           echo "$DATE Restarting container $CONTAINER_SHORT_ID failed" >&2
+          
+          for I in 1 2 3
+          do
+            sleep 30
+            if ! start_container "$CONTAINER_ID"
+            then
+              echo "$DATE Starting container $CONTAINER_SHORT_ID failed" >&2
+            else
+              break
+            fi
+          done
         fi
       fi
     done
